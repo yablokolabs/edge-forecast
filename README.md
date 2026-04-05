@@ -15,6 +15,9 @@ A compact Rust forecasting engine for edge and streaming time-series.
 - compact reservoir forecaster
 - spin-inspired temporal forecaster
 - CSV-based train/eval flow
+- multivariate input support via multiple CSV columns
+- model metadata + saved config/state
+- lightweight HTTP forecast service mode
 - forecasting metrics
 - Lean spec for core mathematical principles
 
@@ -57,7 +60,7 @@ This repo takes inspiration from compact high-memory temporal dynamics and turns
 ```bash
 cargo run --bin edge-forecast -- train \
   --input examples/sample.csv \
-  --column 0 \
+  --columns 0 \
   --model spin \
   --output /tmp/edge-forecast-model.json
 ```
@@ -66,7 +69,6 @@ cargo run --bin edge-forecast -- train \
 ```bash
 cargo run --bin edge-forecast -- forecast \
   --input examples/sample.csv \
-  --column 0 \
   --model-file /tmp/edge-forecast-model.json \
   --horizon 3
 ```
@@ -75,7 +77,7 @@ cargo run --bin edge-forecast -- forecast \
 ```bash
 cargo run --bin edge-forecast -- eval \
   --input examples/sample.csv \
-  --column 0 \
+  --columns 0 \
   --model reservoir
 ```
 
@@ -83,9 +85,32 @@ cargo run --bin edge-forecast -- eval \
 ```bash
 cargo run --bin edge-forecast -- score \
   --input examples/with_anomaly.csv \
-  --column 0 \
+  --columns 0 \
   --model spin \
   --top-k 3
+```
+
+### Train with multiple input columns
+```bash
+cargo run --bin edge-forecast -- train \
+  --input examples/multivariate.csv \
+  --columns 0,1 \
+  --model reservoir \
+  --output /tmp/multivariate-model.json
+```
+
+### Serve forecasts over HTTP
+```bash
+cargo run --bin edge-forecast -- serve \
+  --model-file /tmp/multivariate-model.json \
+  --bind 127.0.0.1:8080
+```
+
+Then POST:
+```bash
+curl -X POST http://127.0.0.1:8080/forecast \
+  -H 'content-type: application/json' \
+  -d '{"context":[0.75,0.80,0.84,0.88,0.91,0.95,0.99,1.02,1.04,1.08],"horizon":3}'
 ```
 
 ## Why this is practical
