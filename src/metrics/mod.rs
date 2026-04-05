@@ -20,6 +20,17 @@ pub fn rmse(actual: &[f64], predicted: &[f64]) -> f64 {
     mse(actual, predicted).sqrt()
 }
 
+pub fn residuals(actual: &[f64], predicted: &[f64]) -> Vec<f64> {
+    actual.iter().zip(predicted).map(|(a, p)| a - p).collect()
+}
+
+pub fn anomaly_scores(actual: &[f64], predicted: &[f64]) -> Vec<f64> {
+    residuals(actual, predicted)
+        .into_iter()
+        .map(f64::abs)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40,5 +51,12 @@ mod tests {
         assert_relative_eq!(mae(&actual, &actual), 0.0);
         assert_relative_eq!(mse(&actual, &actual), 0.0);
         assert_relative_eq!(rmse(&actual, &actual), 0.0);
+    }
+
+    #[test]
+    fn anomaly_scores_match_absolute_residuals() {
+        let actual = [2.0, 4.0, 6.0];
+        let predicted = [1.0, 5.0, 5.5];
+        assert_eq!(anomaly_scores(&actual, &predicted), vec![1.0, 1.0, 0.5]);
     }
 }

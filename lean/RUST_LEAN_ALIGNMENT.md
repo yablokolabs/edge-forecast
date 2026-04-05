@@ -8,11 +8,13 @@ This document explains what the Lean side is intended to formalize for `edge-for
 - `Forecaster`
 - `ModelState`
 - forecasting metrics (`mae`, `mse`, `rmse`)
+- residuals / anomaly scores
 - compact temporal update behavior
 
 ## Lean concepts
 - signals and residuals
 - absolute and squared error
+- anomaly score as absolute residual
 - aggregate loss over horizons
 - simple state-update semantics
 - monotonicity of aggregate loss under smaller pointwise residuals

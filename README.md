@@ -46,10 +46,54 @@ This repo takes inspiration from compact high-memory temporal dynamics and turns
 - forecasting operational metrics on resource-constrained systems
 - embedding compact predictors into Rust services, agents, or edge pipelines
 
-## Planned CLI
+## CLI
 - `edge-forecast train`
 - `edge-forecast forecast`
 - `edge-forecast eval`
+- `edge-forecast score`
+
+## Usage examples
+### Train a spin-inspired model
+```bash
+cargo run --bin edge-forecast -- train \
+  --input examples/sample.csv \
+  --column 0 \
+  --model spin \
+  --output /tmp/edge-forecast-model.json
+```
+
+### Forecast the next 3 points from a saved model
+```bash
+cargo run --bin edge-forecast -- forecast \
+  --input examples/sample.csv \
+  --column 0 \
+  --model-file /tmp/edge-forecast-model.json \
+  --horizon 3
+```
+
+### Evaluate a compact reservoir model
+```bash
+cargo run --bin edge-forecast -- eval \
+  --input examples/sample.csv \
+  --column 0 \
+  --model reservoir
+```
+
+### Score likely anomalies from forecast residuals
+```bash
+cargo run --bin edge-forecast -- score \
+  --input examples/with_anomaly.csv \
+  --column 0 \
+  --model spin \
+  --top-k 3
+```
+
+## Why this is practical
+You can use `edge-forecast` when you want:
+- a small forecasting engine embedded into a Rust service
+- lightweight telemetry forecasting without a heavy ML stack
+- anomaly scoring from prediction residuals
+- an edge-friendly baseline before jumping to larger sequence models
 
 ## Lean
 The Lean side is intended to specify and prove core mathematical properties such as:
