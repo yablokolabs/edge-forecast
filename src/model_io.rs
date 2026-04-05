@@ -1,17 +1,27 @@
 use std::fs;
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use crate::core::ModelState;
 use crate::models::{AutoregressiveForecaster, ReservoirForecaster, SpinForecaster};
 
-pub fn save_model(path: &str, state: &ModelState) -> Result<()> {
-    let json = serde_json::to_string_pretty(state)?;
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedModel {
+    pub model_name: String,
+    pub version: String,
+    pub window_size: usize,
+    pub columns: Vec<usize>,
+    pub state: ModelState,
+}
+
+pub fn save_model(path: &str, model: &SavedModel) -> Result<()> {
+    let json = serde_json::to_string_pretty(model)?;
     fs::write(path, json)?;
     Ok(())
 }
 
-pub fn load_model(path: &str) -> Result<ModelState> {
+pub fn load_model(path: &str) -> Result<SavedModel> {
     let json = fs::read_to_string(path)?;
     Ok(serde_json::from_str(&json)?)
 }
