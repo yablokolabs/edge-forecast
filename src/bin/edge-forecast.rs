@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand, ValueEnum};
 use edge_forecast::core::{ForecastWindow, Forecaster};
 use edge_forecast::data::load_single_column_csv;
-use edge_forecast::metrics::{mae, rmse};
+use edge_forecast::metrics::{anomaly_scores, mae, rmse};
 use edge_forecast::model_io::{build_forecaster_from_state, load_model, save_model};
 use edge_forecast::models::{AutoregressiveForecaster, ReservoirForecaster, SpinForecaster};
 
@@ -44,6 +44,16 @@ enum Command {
         #[arg(long, value_enum)]
         model: ModelKind,
     },
+    Score {
+        #[arg(long)]
+        input: String,
+        #[arg(long, default_value_t = 0)]
+        column: usize,
+        #[arg(long, value_enum)]
+        model: ModelKind,
+        #[arg(long, default_value_t = 5)]
+        top_k: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -73,6 +83,12 @@ fn main() -> Result<()> {
             column,
             model,
         } => eval_cmd(&input, column, model),
+        Command::Score {
+            input,
+            column,
+            model,
+            top_k,
+        } => score_cmd(&input, column, model, top_k),
     }
 }
 
@@ -126,5 +142,36 @@ fn eval_cmd(input: &str, column: usize, model: ModelKind) -> Result<()> {
     let result = forecaster.forecast(&context, test.len())?;
     println!("mae={:.6}", mae(test, &result.predictions));
     println!("rmse={:.6}", rmse(test, &result.predictions));
+    Ok(())
+}
+
+fn score_cmd(input: &str, column: usize, model: ModelKind, top_k: usize) -> Result<()> {
+    let series = load_single_column_csv(input, column)?;
+    if series.len() < 20 {
+        return Err(anyhow!("need at least 20 observations for scoring"));
+    }
+    let split = series.len() * 4 / 5;
+    let train = &series[..split];
+    let test = &series[split..];
+    let mut forecaster = build_model(model);
+    forecaster.fit(train)?;
+    let context = ForecastWindow::new(train[train.len() - 10..].to_vec());
+    let result = forecaster.forecast(&context, test.len())?;
+    let mut scored: Vec<(usize, f64, f64, f64)> = test
+        .iter()
+        .copied()
+        .zip(result.predictions.iter().copied())
+        .enumerate()
+        .map(|(idx, (actual, predicted))| (idx, actual, predicted, (actual - predicted).abs()))
+        .collect();
+    scored.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap_or(core::cmp::Ordering::Equal));
+    println!("top anomaly candidates:");
+    for (idx, actual, predicted, score) in scored.into_iter().take(top_k) {
+        println!(
+            "index={} actual={:.6} predicted={:.6} score={:.6}",
+            idx, actual, predicted, score
+        );
+    }
+    let _ = anomaly_scores(test, &result.predictions);
     Ok(())
 }
