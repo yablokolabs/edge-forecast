@@ -10,13 +10,18 @@ use crate::core::ForecastWindow;
 /// push and eviction — suitable for high-throughput streaming workloads.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnlineState {
-    pub window_size: usize,
-    pub values: VecDeque<f64>,
+    window_size: usize,
+    values: VecDeque<f64>,
 }
 
 impl OnlineState {
+    /// Create a new rolling window state.
+    ///
+    /// # Panics
+    /// Panics if `window_size` is 0.
     #[must_use]
     pub fn new(window_size: usize) -> Self {
+        assert!(window_size > 0, "window_size must be at least 1");
         Self {
             window_size,
             values: VecDeque::with_capacity(window_size),
@@ -40,6 +45,21 @@ impl OnlineState {
     pub fn window(&self) -> ForecastWindow {
         ForecastWindow::new(self.values.iter().copied().collect())
     }
+
+    #[must_use]
+    pub fn window_size(&self) -> usize {
+        self.window_size
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -51,7 +71,7 @@ mod tests {
         let mut state = OnlineState::new(5);
         state.push(1.0);
         state.push(2.0);
-        assert_eq!(state.values.len(), 2);
+        assert_eq!(state.len(), 2);
         assert!(!state.is_ready());
     }
 
@@ -85,5 +105,11 @@ mod tests {
         assert!(!state.is_ready());
         state.push(2.0);
         assert!(state.is_ready());
+    }
+
+    #[test]
+    #[should_panic(expected = "window_size must be at least 1")]
+    fn zero_window_size_panics() {
+        let _ = OnlineState::new(0);
     }
 }

@@ -275,17 +275,27 @@ fn serve_cmd(model_file: &str, bind: &str) -> Result<()> {
         };
         let context = ForecastWindow::new(payload.context);
         match forecaster.forecast(&context, payload.horizon) {
-            Ok(result) => {
-                let response = Response::from_string(
-                    serde_json::to_string(&result.predictions).unwrap_or_default(),
-                )
-                .with_header(
-                    "Content-Type: application/json"
-                        .parse::<tiny_http::Header>()
-                        .expect("valid header"),
-                );
-                let _ = request.respond(response);
-            }
+            Ok(result) => match serde_json::to_string(&result.predictions) {
+                Ok(json) => {
+                    let response = Response::from_string(json).with_header(
+                        "Content-Type: application/json"
+                            .parse::<tiny_http::Header>()
+                            .expect("valid header"),
+                    );
+                    let _ = request.respond(response);
+                }
+                Err(e) => {
+                    let msg = serde_json::json!({ "error": format!("serialization failed: {e}") });
+                    let response = Response::from_string(msg.to_string())
+                        .with_status_code(500)
+                        .with_header(
+                            "Content-Type: application/json"
+                                .parse::<tiny_http::Header>()
+                                .expect("valid header"),
+                        );
+                    let _ = request.respond(response);
+                }
+            },
             Err(e) => {
                 let msg = serde_json::json!({ "error": format!("forecast failed: {e}") });
                 let response = Response::from_string(msg.to_string())
