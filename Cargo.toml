@@ -11,13 +11,21 @@ categories = ["algorithms", "science"]
 
 [dependencies]
 anyhow = "1"
-clap = { version = "4", features = ["derive"] }
 csv = "1"
-rand = "0.9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-thiserror = "2"
-tiny_http = "0.12"
+
+# Binary-only dependencies, gated behind the "cli" feature
+clap = { version = "4", features = ["derive"], optional = true }
+tiny_http = { version = "0.12", optional = true }
+
+[features]
+default = ["cli"]
+cli = ["dep:clap", "dep:tiny_http"]
+
+[[bin]]
+name = "edge-forecast"
+required-features = ["cli"]
 
 [dev-dependencies]
 approx = "0.5"

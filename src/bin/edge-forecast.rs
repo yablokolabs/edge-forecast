@@ -235,17 +235,79 @@ fn serve_cmd(model_file: &str, bind: &str) -> Result<()> {
     println!("POST /forecast with JSON: {{\"context\": [..], \"horizon\": 3}}");
     for mut request in server.incoming_requests() {
         if request.method() != &Method::Post || request.url() != "/forecast" {
-            let response = Response::from_string("not found").with_status_code(404);
+            let response = Response::from_string(r#"{"error":"not found"}"#)
+                .with_status_code(404)
+                .with_header(
+                    "Content-Type: application/json"
+                        .parse::<tiny_http::Header>()
+                        .expect("valid header"),
+                );
             let _ = request.respond(response);
             continue;
         }
         let mut body = String::new();
-        request.as_reader().read_to_string(&mut body)?;
-        let payload: ForecastRequest = serde_json::from_str(&body)?;
+        if let Err(e) = request.as_reader().read_to_string(&mut body) {
+            let msg = serde_json::json!({ "error": format!("failed to read body: {e}") });
+            let response = Response::from_string(msg.to_string())
+                .with_status_code(400)
+                .with_header(
+                    "Content-Type: application/json"
+                        .parse::<tiny_http::Header>()
+                        .expect("valid header"),
+                );
+            let _ = request.respond(response);
+            continue;
+        }
+        let payload: ForecastRequest = match serde_json::from_str(&body) {
+            Ok(p) => p,
+            Err(e) => {
+                let msg = serde_json::json!({ "error": format!("invalid JSON: {e}") });
+                let response = Response::from_string(msg.to_string())
+                    .with_status_code(400)
+                    .with_header(
+                        "Content-Type: application/json"
+                            .parse::<tiny_http::Header>()
+                            .expect("valid header"),
+                    );
+                let _ = request.respond(response);
+                continue;
+            }
+        };
         let context = ForecastWindow::new(payload.context);
-        let result = forecaster.forecast(&context, payload.horizon)?;
-        let response = Response::from_string(serde_json::to_string(&result.predictions)?);
-        let _ = request.respond(response);
+        match forecaster.forecast(&context, payload.horizon) {
+            Ok(result) => match serde_json::to_string(&result.predictions) {
+                Ok(json) => {
+                    let response = Response::from_string(json).with_header(
+                        "Content-Type: application/json"
+                            .parse::<tiny_http::Header>()
+                            .expect("valid header"),
+                    );
+                    let _ = request.respond(response);
+                }
+                Err(e) => {
+                    let msg = serde_json::json!({ "error": format!("serialization failed: {e}") });
+                    let response = Response::from_string(msg.to_string())
+                        .with_status_code(500)
+                        .with_header(
+                            "Content-Type: application/json"
+                                .parse::<tiny_http::Header>()
+                                .expect("valid header"),
+                        );
+                    let _ = request.respond(response);
+                }
+            },
+            Err(e) => {
+                let msg = serde_json::json!({ "error": format!("forecast failed: {e}") });
+                let response = Response::from_string(msg.to_string())
+                    .with_status_code(500)
+                    .with_header(
+                        "Content-Type: application/json"
+                            .parse::<tiny_http::Header>()
+                            .expect("valid header"),
+                    );
+                let _ = request.respond(response);
+            }
+        }
     }
     Ok(())
 }

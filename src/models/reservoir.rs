@@ -62,3 +62,45 @@ impl Forecaster for ReservoirForecaster {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reservoir_fit_and_predict() {
+        let mut r = ReservoirForecaster::default();
+        let series: Vec<f64> = (0..20).map(|i| i as f64 * 0.1).collect();
+        r.fit(&series).unwrap();
+        let ctx = ForecastWindow::new(series[15..].to_vec());
+        let next = r.predict_next(&ctx).unwrap();
+        assert!(next.is_finite());
+    }
+
+    #[test]
+    fn reservoir_fit_rejects_short_series() {
+        let mut r = ReservoirForecaster::default();
+        assert!(r.fit(&[1.0]).is_err());
+    }
+
+    #[test]
+    fn reservoir_predict_on_empty_context_fails() {
+        let r = ReservoirForecaster::default();
+        assert!(r.predict_next(&ForecastWindow::new(vec![])).is_err());
+    }
+
+    #[test]
+    fn reservoir_encode_bounded() {
+        let r = ReservoirForecaster::default();
+        let large: Vec<f64> = (0..100).map(|i| i as f64 * 100.0).collect();
+        let state = r.encode(&large);
+        // tanh output is bounded in [-1, 1]
+        assert!(state.abs() <= 1.0);
+    }
+
+    #[test]
+    fn reservoir_model_state_variant() {
+        let r = ReservoirForecaster::default();
+        assert!(matches!(r.model_state(), ModelState::Reservoir { .. }));
+    }
+}

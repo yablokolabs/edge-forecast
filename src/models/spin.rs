@@ -70,3 +70,58 @@ impl Forecaster for SpinForecaster {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spin_fit_and_predict() {
+        let mut s = SpinForecaster::default();
+        let series: Vec<f64> = (0..20).map(|i| i as f64 * 0.1).collect();
+        s.fit(&series).unwrap();
+        let ctx = ForecastWindow::new(series[15..].to_vec());
+        let next = s.predict_next(&ctx).unwrap();
+        assert!(next.is_finite());
+    }
+
+    #[test]
+    fn spin_fit_rejects_short_series() {
+        let mut s = SpinForecaster::default();
+        assert!(s.fit(&[1.0]).is_err());
+    }
+
+    #[test]
+    fn spin_predict_on_empty_context_fails() {
+        let s = SpinForecaster::default();
+        assert!(s.predict_next(&ForecastWindow::new(vec![])).is_err());
+    }
+
+    #[test]
+    fn spin_encode_bounded() {
+        let s = SpinForecaster::default();
+        let large: Vec<f64> = (0..100).map(|i| i as f64 * 100.0).collect();
+        let encoded = s.encode(&large);
+        // mean of three tanh values, bounded in [-1, 1]
+        assert!(encoded.abs() <= 1.0);
+    }
+
+    #[test]
+    fn spin_model_state_variant() {
+        let s = SpinForecaster::default();
+        assert!(matches!(s.model_state(), ModelState::Spin { .. }));
+    }
+
+    #[test]
+    fn spin_forecast_multi_horizon() {
+        let mut s = SpinForecaster::default();
+        let series: Vec<f64> = (0..20).map(|i| i as f64 * 0.1).collect();
+        s.fit(&series).unwrap();
+        let ctx = ForecastWindow::new(series[15..].to_vec());
+        let result = s.forecast(&ctx, 5).unwrap();
+        assert_eq!(result.predictions.len(), 5);
+        for p in &result.predictions {
+            assert!(p.is_finite());
+        }
+    }
+}
