@@ -1,4 +1,5 @@
 pub mod core;
+#[cfg(feature = "cli")]
 pub mod data;
 pub mod metrics;
 pub mod model_io;

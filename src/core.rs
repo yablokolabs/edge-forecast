@@ -65,13 +65,49 @@ pub trait Forecaster {
     fn model_state(&self) -> ModelState;
 
     fn forecast(&self, context: &ForecastWindow, horizon: usize) -> anyhow::Result<ForecastResult> {
-        let mut history = context.values.clone();
+        let mut window = context.clone();
         let mut predictions = Vec::with_capacity(horizon);
         for _ in 0..horizon {
-            let next = self.predict_next(&ForecastWindow::new(history.clone()))?;
+            let next = self.predict_next(&window)?;
             predictions.push(next);
-            history.push(next);
+            window.values.push(next);
         }
         Ok(ForecastResult { predictions })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forecast_window_len_and_empty() {
+        let empty = ForecastWindow::new(vec![]);
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+
+        let non_empty = ForecastWindow::new(vec![1.0, 2.0]);
+        assert!(!non_empty.is_empty());
+        assert_eq!(non_empty.len(), 2);
+    }
+
+    #[test]
+    fn forecast_result_next() {
+        let empty = ForecastResult {
+            predictions: vec![],
+        };
+        assert_eq!(empty.next(), None);
+
+        let result = ForecastResult {
+            predictions: vec![3.15, 2.72],
+        };
+        assert_eq!(result.next(), Some(3.15));
+    }
+
+    #[test]
+    fn forecast_window_preserves_values() {
+        let values = vec![1.0, 2.0, 3.0];
+        let window = ForecastWindow::new(values.clone());
+        assert_eq!(window.values, values);
     }
 }
